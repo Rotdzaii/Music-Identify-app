@@ -4,3 +4,5 @@ python-multipart
 whisperx
 torch
 torchaudio
+faster-whisper
+av

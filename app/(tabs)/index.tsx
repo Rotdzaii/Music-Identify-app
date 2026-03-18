@@ -1,9 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Mic, RotateCcw, Square, X } from 'lucide-react-native';
-import { useState } from 'react';
+import { RotateCcw, X } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -13,29 +15,99 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import DetectedLyrics from '@/components/DetectedLyrics';
-import LanguageSelector from '@/components/LanguageSelector';
-import ResultCard from '@/components/ResultCard';
+import LanguagePicker, { type SupportedLanguage } from '@/components/LanguagePicker';
+import MusicPlayerMini from '@/components/MusicPlayerMini';
+import RecordButton, { type RecordingStatus } from '@/components/RecordButton';
 import { Theme } from '@/constants/Theme';
+import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import { useRecording } from '@/hooks/useRecording';
 import { generateId } from '@/lib/music-utils';
-import { appendHistory } from '@/services/historyStorage';
-import { searchSongByLyrics } from '@/services/musicSearch';
-import { convertSpeechToText } from '@/services/sttService';
-import { cleanLyrics } from '@/services/text-processor';
-import type { RecognitionResult } from '@/types/recognition';
+import { ApiError } from '@/services/apiService';
+import { saveToHistory } from '@/services/historyService';
+import type { SttSongMatch } from '@/services/sttService';
+import { transcribeAudio } from '@/services/sttService';
+
+const LANGUAGE_STORAGE_KEY = '@musicid/selected-language';
 
 export default function HomeScreen() {
-  const [language, setLanguage] = useState('en');
+  const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>('vi');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [detectedLyrics, setDetectedLyrics] = useState('');
-  const [result, setResult] = useState<RecognitionResult | null>(null);
+  const [sttTexts, setSttTexts] = useState<{ rawText: string; cleanedText: string } | null>(null);
+  const [songMatches, setSongMatches] = useState<SttSongMatch[]>([]);
+  const {
+    currentTrack,
+    isVisible,
+    isPlaying,
+    isBuffering,
+    playbackPosition,
+    duration,
+    playTrack,
+    togglePlayPause,
+    closePlayer,
+  } = useMusicPlayer();
   const { isRecording, lastRecordingUri, startRecording, stopRecording } = useRecording();
 
+  useEffect(() => {
+    const loadSavedLanguage = async () => {
+      try {
+        const saved = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
+        if (saved === 'vi' || saved === 'en') {
+          setSelectedLanguage(saved);
+        }
+      } catch {
+        // Ignore persisted language read errors.
+      }
+    };
+
+    loadSavedLanguage().catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, selectedLanguage).catch(() => undefined);
+  }, [selectedLanguage]);
+
   const showProcessingError = (error: unknown) => {
+    if (error instanceof ApiError) {
+      if (error.code === 'NETWORK') {
+        Alert.alert('Lỗi', 'Không thể kết nối với máy chủ');
+        return;
+      }
+
+      if (error.code === 'NO_SPEECH') {
+        Alert.alert('Lỗi', 'Không thể nhận diện được lời thoại. Hãy ghi âm rõ hơn từ 2-4 giây.');
+        return;
+      }
+
+      if (error.code === 'NO_MATCH') {
+        Alert.alert('Lỗi', 'Không tìm thấy bài hát phù hợp');
+        return;
+      }
+    }
+
     const message = error instanceof Error ? error.message : '';
 
-    if (message.includes('Network Error') || message.includes('network') || message.includes('Network')) {
-      Alert.alert('Lỗi mạng', 'Vui lòng kiểm tra kết nối Internet và thử lại.');
+    if (message.includes('network') || message.includes('Network')) {
+      Alert.alert('Lỗi', 'Không thể kết nối với máy chủ');
+      return;
+    }
+
+    if (message.includes('Không thể nhận diện được lời thoại')) {
+      Alert.alert('Lỗi', 'Không thể nhận diện được lời thoại. Hãy ghi âm rõ hơn từ 2-4 giây.');
+      return;
+    }
+
+    if (message.includes('Không tìm thấy bài hát phù hợp')) {
+      Alert.alert('Lỗi', 'Không tìm thấy bài hát phù hợp');
+      return;
+    }
+
+    if (message.includes('Không thể xử lý định dạng audio đầu vào')) {
+      Alert.alert('Lỗi', 'Server không xử lý được định dạng audio. Vui lòng thử lại.');
+      return;
+    }
+
+    if (message.includes('Không thể khởi tạo mô hình STT trên server')) {
+      Alert.alert('Lỗi', 'Server STT chưa sẵn sàng. Vui lòng kiểm tra backend.');
       return;
     }
 
@@ -44,43 +116,38 @@ export default function HomeScreen() {
       return;
     }
 
-    Alert.alert('Có lỗi xảy ra', 'Không thể xử lý âm thanh. Vui lòng thử lại.');
+    Alert.alert('Lỗi', 'Không thể kết nối với máy chủ');
   };
 
   const runRecognition = async (audioUri: string) => {
     setIsProcessing(true);
 
     try {
-      const rawText = await convertSpeechToText(audioUri, language);
-      setDetectedLyrics(rawText);
+      const sttResult = await transcribeAudio(audioUri, selectedLanguage);
+      setSttTexts(sttResult);
+      setSongMatches(sttResult.matches);
 
-      const cleanedLyrics = cleanLyrics(rawText);
+      const cleanedLyrics = sttResult.cleanedText;
 
       if (!cleanedLyrics) {
-        Alert.alert('Khong ro loi bai hat', 'Vui long thu lai voi am thanh ro hon.');
+        Alert.alert('Lỗi', 'Không thể nhận diện được lời thoại. Hãy ghi âm rõ hơn từ 2-4 giây.');
         return;
       }
 
-      const song = await searchSongByLyrics(cleanedLyrics);
-
-      if (!song) {
-        Alert.alert('Không tìm thấy bài hát phù hợp', 'Không tìm thấy bài hát phù hợp');
+      if (sttResult.matches.length === 0) {
+        Alert.alert('Lỗi', 'Không tìm thấy bài hát phù hợp');
         return;
       }
 
-      const recognitionResult: RecognitionResult = {
-        id: generateId(song.id),
-        title: song.title,
-        artist: song.artist,
-        lyrics: song.matchedLyricsSnippet ?? song.lyrics,
-        language,
-        audioUri,
+      const firstMatch = sttResult.matches[0];
+      await saveToHistory({
+        id: generateId('history'),
+        title: firstMatch.title,
+        artist: firstMatch.artist,
+        album_art: firstMatch.albumArt,
+        preview_url: firstMatch.previewUrl,
         timestamp: new Date().toISOString(),
-        albumArtUri: song.albumArtUri,
-      };
-
-      setResult(recognitionResult);
-      await appendHistory(recognitionResult);
+      });
     } catch (error) {
       showProcessingError(error);
     } finally {
@@ -88,29 +155,57 @@ export default function HomeScreen() {
     }
   };
 
-  const handleRecordButton = async () => {
+  const handleStartRecording = async () => {
     if (isProcessing) {
       return;
     }
 
     try {
-      if (isRecording) {
-        const audioUri = await stopRecording();
-        if (audioUri) {
-          await runRecognition(audioUri);
-        }
-        return;
-      }
-
       await startRecording();
     } catch {
       Alert.alert('Khong the ghi am', 'Vui long cap quyen micro va thu lai.');
     }
   };
 
+  const handleStopRecording = async () => {
+    if (isProcessing || !isRecording) {
+      return;
+    }
+
+    try {
+      const audioUri = await stopRecording();
+      if (audioUri) {
+        await runRecognition(audioUri);
+      }
+    } catch {
+      Alert.alert('Khong the ghi am', 'Vui long cap quyen micro va thu lai.');
+    }
+  };
+
   const handleClear = () => {
-    setResult(null);
-    setDetectedLyrics('');
+    setSttTexts(null);
+    setSongMatches([]);
+    closePlayer().catch(() => undefined);
+  };
+
+  const handleSelectTrack = async (song: SttSongMatch, index: number) => {
+    if (!song.previewUrl) {
+      Alert.alert('Lỗi', 'Không có bản nghe thử cho bài hát này');
+      return;
+    }
+
+    try {
+      await playTrack({
+        id: `${song.title}-${song.artist}-${index}`,
+        title: song.title,
+        artist: song.artist,
+        albumArt: song.albumArt,
+        albumName: song.albumName,
+        previewUrl: song.previewUrl,
+      });
+    } catch {
+      Alert.alert('Lỗi', 'Không thể phát bản nghe thử');
+    }
   };
 
   const handleRetry = async () => {
@@ -121,8 +216,10 @@ export default function HomeScreen() {
       return;
     }
 
-    await handleRecordButton();
+    await handleStartRecording();
   };
+
+  const recordingStatus: RecordingStatus = isProcessing ? 'processing' : isRecording ? 'recording' : 'idle';
 
   return (
     <LinearGradient
@@ -135,25 +232,12 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <LanguageSelector language={language} onChange={setLanguage} />
+          <View style={styles.languagePickerWrap}>
+            <LanguagePicker selectedLanguage={selectedLanguage} onSelectLanguage={setSelectedLanguage} />
+          </View>
 
           <View style={styles.centerSection}>
-            <View style={styles.recordWrap}>
-              {isRecording ? <View style={styles.pulseRing} /> : null}
-
-              <TouchableOpacity
-                style={[styles.recordButton, isRecording ? styles.recordButtonActive : undefined]}
-                onPress={handleRecordButton}
-                activeOpacity={0.88}
-                disabled={isProcessing}
-              >
-                {isRecording ? (
-                  <Square size={44} color={Theme.colors.foreground} />
-                ) : (
-                  <Mic size={44} color={Theme.colors.foreground} />
-                )}
-              </TouchableOpacity>
-            </View>
+            <RecordButton status={recordingStatus} onStart={handleStartRecording} onStop={handleStopRecording} />
 
             <View style={styles.statusWrap}>
               <Text style={styles.statusText}>
@@ -166,26 +250,84 @@ export default function HomeScreen() {
               {isProcessing ? <ActivityIndicator color={Theme.colors.primary} style={styles.loading} /> : null}
             </View>
 
-            {result ? (
+            {sttTexts ? (
               <View style={styles.resultArea}>
-                <ResultCard result={result} />
-                <DetectedLyrics lyrics={detectedLyrics || result.lyrics} />
+                {sttTexts ? (
+                  <>
+                    <DetectedLyrics lyrics={sttTexts.rawText} />
+
+                    <View style={styles.cleanedTextCard}>
+                      <Text style={styles.cleanedTextLabel}>Cleaned Text</Text>
+                      <Text style={styles.cleanedTextValue}>{sttTexts.cleanedText || 'No cleaned text.'}</Text>
+                    </View>
+                  </>
+                ) : null}
+
+                {songMatches.length > 0 ? (
+                  <View style={styles.matchesList}>
+                    {songMatches.map((song, index) => (
+                      <TouchableOpacity
+                        key={`${song.title}-${song.artist}-${index}`}
+                        style={styles.songCard}
+                        activeOpacity={0.9}
+                        onPress={() => {
+                          handleSelectTrack(song, index).catch(() => undefined);
+                        }}
+                      >
+                        <Image
+                          source={{
+                            uri:
+                              song.albumArt ||
+                              'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=300&q=80',
+                          }}
+                          style={styles.songArt}
+                        />
+                        <View style={styles.songInfo}>
+                          <Text numberOfLines={1} style={styles.songTitle}>
+                            {song.title}
+                          </Text>
+                          <Text numberOfLines={1} style={styles.songSubtitle}>
+                            {song.artist}
+                          </Text>
+                          <Text numberOfLines={1} style={styles.songAlbum}>
+                            {song.albumName || 'Unknown album'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : null}
 
                 <View style={styles.actionRow}>
                   <TouchableOpacity onPress={handleClear} style={styles.secondaryButton} activeOpacity={0.85}>
                     <X size={16} color={Theme.colors.foregroundMuted} />
-                    <Text style={styles.secondaryButtonText}>Clear</Text>
+                    <Text style={styles.secondaryButtonText}>Xóa</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity onPress={handleRetry} style={styles.primaryButton} activeOpacity={0.85}>
                     <RotateCcw size={16} color={Theme.colors.foreground} />
-                    <Text style={styles.primaryButtonText}>Retry</Text>
+                    <Text style={styles.primaryButtonText}>Tìm lại</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             ) : null}
           </View>
         </ScrollView>
+
+        <MusicPlayerMini
+          track={currentTrack}
+          isVisible={isVisible}
+          isPlaying={isPlaying}
+          isBuffering={isBuffering}
+          playbackPosition={playbackPosition}
+          duration={duration}
+          onPlayPause={() => {
+            togglePlayPause().catch(() => undefined);
+          }}
+          onClose={() => {
+            closePlayer().catch(() => undefined);
+          }}
+        />
       </SafeAreaView>
     </LinearGradient>
   );
@@ -205,6 +347,10 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     alignItems: 'center',
   },
+  languagePickerWrap: {
+    width: '100%',
+    alignItems: 'flex-end',
+  },
   centerSection: {
     flex: 1,
     width: '100%',
@@ -212,38 +358,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 24,
     paddingTop: 18,
-  },
-  recordWrap: {
-    width: 170,
-    height: 170,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pulseRing: {
-    position: 'absolute',
-    width: 170,
-    height: 170,
-    borderRadius: 120,
-    borderWidth: 2,
-    borderColor: Theme.colors.alphaDestructive50,
-    backgroundColor: Theme.colors.alphaDestructive08,
-  },
-  recordButton: {
-    width: 132,
-    height: 132,
-    borderRadius: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Theme.colors.primary,
-    shadowColor: Theme.colors.primary,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 16,
-    shadowOpacity: 0.45,
-    elevation: 10,
-  },
-  recordButtonActive: {
-    backgroundColor: Theme.colors.destructive,
-    shadowColor: Theme.colors.destructive,
   },
   statusWrap: {
     alignItems: 'center',
@@ -298,5 +412,62 @@ const styles = StyleSheet.create({
     color: Theme.colors.foreground,
     fontSize: 14,
     fontWeight: '700',
+  },
+  cleanedTextCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Theme.colors.alphaBorderStrong,
+    backgroundColor: Theme.colors.alphaCardGlassStrong,
+    padding: 12,
+    gap: 6,
+  },
+  cleanedTextLabel: {
+    color: Theme.colors.mutedForeground,
+    fontSize: 12,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    fontWeight: '700',
+  },
+  cleanedTextValue: {
+    color: Theme.colors.foreground,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  matchesList: {
+    gap: 10,
+  },
+  songCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Theme.colors.alphaBorderStrong,
+    backgroundColor: Theme.colors.alphaCardGlassStrong,
+    padding: 10,
+  },
+  songArt: {
+    width: 62,
+    height: 62,
+    borderRadius: 10,
+    backgroundColor: Theme.colors.alphaCardGlass,
+  },
+  songInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  songTitle: {
+    color: Theme.colors.foreground,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  songSubtitle: {
+    color: Theme.colors.secondary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  songAlbum: {
+    color: Theme.colors.mutedForeground,
+    fontSize: 12,
   },
 });

@@ -1,12 +1,12 @@
 import { Tabs } from 'expo-router';
 import { Clock3, House } from 'lucide-react-native';
+import { useColorScheme } from 'react-native';
 
-import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { Theme } from '@/constants/Theme';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() ?? 'dark';
 
   return (
     <Tabs
