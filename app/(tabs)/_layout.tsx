@@ -6,7 +6,7 @@ import Colors from '@/constants/Colors';
 import { Theme } from '@/constants/Theme';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme() ?? 'dark';
+  const colorScheme = useColorScheme() === 'light' ? 'light' : 'dark';
 
   return (
     <Tabs

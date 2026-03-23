@@ -4,35 +4,48 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Play, Trash2 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import EmptyState from '@/components/EmptyState';
+import MusicPlayerMini from '@/components/MusicPlayerMini';
 import { Theme } from '@/constants/Theme';
 import { glassmorphism } from '@/constants/globalStyles';
+import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import { formatRelativeTime } from '@/lib/music-utils';
-import { deleteHistoryItem, loadHistory } from '@/services/historyStorage';
-import type { RecognitionResult } from '@/types/recognition';
+import { clearHistory, getHistory, type HistoryTrack } from '@/services/historyService';
 
 export default function HistoryScreen() {
-  const [history, setHistory] = useState<RecognitionResult[]>([]);
+  const [history, setHistory] = useState<HistoryTrack[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const {
+    currentTrack,
+    isVisible,
+    isPlaying,
+    isBuffering,
+    playbackPosition,
+    duration,
+    playTrack,
+    togglePlayPause,
+    closePlayer,
+  } = useMusicPlayer();
 
   const refreshHistory = async (showLoading = false) => {
     if (showLoading) {
       setIsLoading(true);
     }
 
-    const items = await loadHistory();
+    const items = await getHistory();
     setHistory(items);
     setIsLoading(false);
   };
@@ -43,9 +56,43 @@ export default function HistoryScreen() {
     }, [])
   );
 
-  const handleDelete = async (id: string) => {
-    await deleteHistoryItem(id);
-    setHistory((prev) => prev.filter((item) => item.id !== id));
+  const handlePlayHistoryTrack = async (item: HistoryTrack) => {
+    if (!item.preview_url) {
+      Alert.alert('Lỗi', 'Không có bản nghe thử cho bài hát này');
+      return;
+    }
+
+    try {
+      await playTrack({
+        id: item.id,
+        title: item.title,
+        artist: item.artist,
+        albumArt: item.album_art,
+        previewUrl: item.preview_url,
+      });
+    } catch {
+      Alert.alert('Lỗi', 'Không thể phát bản nghe thử');
+    }
+  };
+
+  const handleClearAll = async () => {
+    Alert.alert('Xóa lịch sử', 'Bạn có chắc muốn xóa toàn bộ lịch sử?', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Xóa',
+        style: 'destructive',
+        onPress: () => {
+          clearHistory()
+            .then(() => {
+              setHistory([]);
+              closePlayer().catch(() => undefined);
+            })
+            .catch(() => {
+              Alert.alert('Lỗi', 'Không thể xóa lịch sử');
+            });
+        },
+      },
+    ]);
   };
 
   const handleRefresh = async () => {
@@ -63,7 +110,15 @@ export default function HistoryScreen() {
         <View style={styles.container}>
           <View style={styles.header}>
             <Text style={styles.title}>Recognition History</Text>
-            <Text style={styles.subtitle}>{history.length} songs recognized</Text>
+            <View style={styles.headerMetaRow}>
+              <Text style={styles.subtitle}>{history.length} songs recognized</Text>
+              {history.length > 0 ? (
+                <TouchableOpacity style={styles.clearAllButton} onPress={handleClearAll} activeOpacity={0.85}>
+                  <Trash2 size={14} color={Theme.colors.destructive} />
+                  <Text style={styles.clearAllText}>Clear all</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
           </View>
 
           {isLoading ? (
@@ -84,7 +139,22 @@ export default function HistoryScreen() {
               }
               renderItem={({ item }) => (
                 <BlurView intensity={26} tint="dark" style={styles.itemCard}>
-                  <View style={styles.itemContent}>
+                  <TouchableOpacity
+                    style={styles.itemContent}
+                    activeOpacity={0.9}
+                    onPress={() => {
+                      handlePlayHistoryTrack(item).catch(() => undefined);
+                    }}
+                  >
+                    <Image
+                      source={{
+                        uri:
+                          item.album_art ||
+                          'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=300&q=80',
+                      }}
+                      style={styles.albumArt}
+                    />
+
                     <View style={styles.songInfo}>
                       <Text numberOfLines={1} style={styles.songTitle}>
                         {item.title}
@@ -96,18 +166,11 @@ export default function HistoryScreen() {
                     </View>
 
                     <View style={styles.actions}>
-                      <TouchableOpacity
-                        style={styles.iconButton}
-                        onPress={() => Alert.alert('Preview', 'Tinh nang nghe thu se duoc bo sung.')}
-                      >
+                      <TouchableOpacity style={styles.iconButton} onPress={() => handlePlayHistoryTrack(item)}>
                         <Play size={16} color={Theme.colors.secondary} />
                       </TouchableOpacity>
-
-                      <TouchableOpacity style={styles.iconButton} onPress={() => handleDelete(item.id)}>
-                        <Trash2 size={16} color={Theme.colors.destructive} />
-                      </TouchableOpacity>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 </BlurView>
               )}
             />
@@ -118,6 +181,21 @@ export default function HistoryScreen() {
             />
           )}
         </View>
+
+        <MusicPlayerMini
+          track={currentTrack}
+          isVisible={isVisible}
+          isPlaying={isPlaying}
+          isBuffering={isBuffering}
+          playbackPosition={playbackPosition}
+          duration={duration}
+          onPlayPause={() => {
+            togglePlayPause().catch(() => undefined);
+          }}
+          onClose={() => {
+            closePlayer().catch(() => undefined);
+          }}
+        />
       </SafeAreaView>
     </LinearGradient>
   );
@@ -140,6 +218,11 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     gap: 2,
   },
+  headerMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   title: {
     color: Theme.colors.foreground,
     fontSize: 28,
@@ -149,6 +232,22 @@ const styles = StyleSheet.create({
     color: Theme.colors.mutedForeground,
     fontSize: 13,
     fontWeight: '500',
+  },
+  clearAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: Theme.colors.alphaCardGlass,
+    borderWidth: 1,
+    borderColor: Theme.colors.alphaBorderSoft,
+  },
+  clearAllText: {
+    color: Theme.colors.destructive,
+    fontSize: 12,
+    fontWeight: '700',
   },
   loaderWrap: {
     flex: 1,
@@ -173,6 +272,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
+  },
+  albumArt: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: Theme.colors.alphaCardGlass,
   },
   songInfo: {
     flex: 1,

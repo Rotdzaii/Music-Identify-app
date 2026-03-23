@@ -6,7 +6,6 @@ import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import 'react-native-reanimated';
 
-
 export {
     // Catch any errors thrown by the Layout component.
     ErrorBoundary

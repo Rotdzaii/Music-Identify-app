@@ -20,12 +20,19 @@ export function useRecording() {
 
 		const permission = await Audio.requestPermissionsAsync();
 		if (!permission.granted) {
+			console.error('[useRecording] Microphone permission denied', {
+				canAskAgain: permission.canAskAgain,
+				expires: permission.expires,
+				status: permission.status,
+			});
 			throw new Error('Microphone permission is required.');
 		}
 
 		await Audio.setAudioModeAsync({
 			allowsRecordingIOS: true,
 			playsInSilentModeIOS: true,
+			staysActiveInBackground: true,
+			playThroughEarpieceAndroid: false,
 		});
 
 		const { recording } = await Audio.Recording.createAsync(
@@ -43,6 +50,8 @@ export function useRecording() {
 		}
 
 		try {
+			// Give encoder a brief moment to flush audio data before unloading.
+			await new Promise((resolve) => setTimeout(resolve, 300));
 			await activeRecording.stopAndUnloadAsync();
 			const uri = activeRecording.getURI() ?? null;
 
@@ -56,6 +65,9 @@ export function useRecording() {
 			recordingRef.current = null;
 			await Audio.setAudioModeAsync({
 				allowsRecordingIOS: false,
+				playsInSilentModeIOS: true,
+				staysActiveInBackground: false,
+				playThroughEarpieceAndroid: false,
 			});
 		}
 	}, []);

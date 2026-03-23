@@ -1,6 +1,10 @@
 fastapi
 uvicorn
 python-multipart
+python-dotenv
+requests
 whisperx
 torch
 torchaudio
+faster-whisper
+av

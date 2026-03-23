@@ -1,5 +1,6 @@
 {
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "typescript.tsserver.experimental.enableProjectDiagnostics": false,
   "editor.codeActionsOnSave": {
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
