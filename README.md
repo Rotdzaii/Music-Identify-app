@@ -52,27 +52,40 @@ MUSICIDAPP/
 
 Để đạt được hiệu quả nhận diện tốt nhất, vui lòng thực hiện theo các bước sau:
 
-### 1. Khởi đầu & Thiết lập
-* **Mở ứng dụng:** Hệ thống sẽ đưa bạn đến màn hình chính ngay khi khởi động[cite: 3].
-* **Chọn ngôn ngữ:** Nhấn vào biểu tượng quả cầu hoặc danh sách ngôn ngữ để chọn ngôn ngữ phù hợp với bài hát bạn sắp đọc/hát (Ví dụ: Tiếng Việt, Tiếng Anh...)[cite: 57, 58].
+# 🎵 Ứng dụng Nhận diện Âm nhạc (Music Recognition System)
 
-### 2. Quá trình nhận diện bài hát
-* **Bắt đầu ghi âm:** Nhấn nút **Record** trên màn hình chính để hệ thống bắt đầu ghi nhận âm thanh từ microphone[cite: 8, 10].
-* **Kết thúc ghi âm:** * Bạn có thể chủ động nhấn nút **Stop** để kết thúc[cite: 9].
-    * Hoặc hệ thống sẽ tự động dừng khi đã nhận diện đủ dữ liệu và tìm thấy danh sách bài nhạc phù hợp[cite: 9].
-* **Kiểm tra lời thoại:** Sau khi dừng, văn bản lời bài hát được nhận diện (STT) sẽ hiển thị trên màn hình để bạn kiểm tra độ chính xác[cite: 13, 14].
+Hệ thống nhận diện âm nhạc sử dụng kiến trúc "Động cơ kép", hỗ trợ tìm kiếm bài hát thông qua âm thanh gốc (nhạc phát từ loa) và nhận diện giọng hát chay (A Cappella).
 
-### 3. Xem kết quả & Tương tác
-* **Thông tin bài hát:** Nếu tìm thấy kết quả phù hợp, ứng dụng sẽ hiển thị:
-    * Tên bài hát[cite: 30].
-    * Tên ca sĩ (nếu có dữ liệu)[cite: 32].
-    * Một phần lời bài hát tương ứng để đối chiếu[cite: 33].
-* **Nghe thử:** Nếu kết quả hợp lệ, bạn có thể nhấn nút phát để nghe đoạn nhạc mẫu của bài hát đó[cite: 59, 61].
-* **Tìm kiếm lại:** Bạn có thể nhấn nút **Retry** để thực hiện tìm kiếm lại ngay lập tức mà không cần thoát ứng dụng[cite: 47].
-* **Xóa kết quả:** Sử dụng nút xóa để dọn dẹp kết quả tìm kiếm hiện tại trên màn hình[cite: 49].
+## 🚀 Hướng dẫn cài đặt và chạy trên máy tính mới
 
-### 4. Quản lý lịch sử & Hệ thống
-* **Xem lịch sử:** Truy cập mục Lịch sử để xem lại các đoạn lời thoại đã nhận diện và các kết quả bài hát được tìm thấy trước đó[cite: 50, 53, 55].
-* **Xử lý khi không có kết quả:** * Nếu hệ thống báo "Không tìm thấy bài hát phù hợp", hãy thử ghi âm lại với lời thoại rõ ràng hơn[cite: 34, 36, 43].
-    * Đảm bảo microphone không bị che khuất và môi trường xung quanh không quá ồn[cite: 38, 40].
-* **Thoát ứng dụng:** Bạn có thể thoát ứng dụng bất cứ lúc nào, hệ thống đảm bảo dữ liệu của bạn được bảo mật và không bị mất[cite: 63, 64].
+### 1. Khởi động Backend
+Mở terminal, di chuyển vào thư mục `backend`:
+
+cd backend
+ ### Tạo môi trường ảo và cài đặt thư viện:
+
+Bash
+python -m venv venv
+# Kích hoạt venv (Windows): venv\Scripts\activate
+# Kích hoạt venv (Mac/Linux): source venv/bin/activate
+
+pip install -r requirements.txt
+### Cấu hình biến môi trường (CỰC KỲ QUAN TRỌNG):
+### Tạo một file tên là .env nằm trong thư mục backend, sau đó dán các API Key của bạn vào theo định dạng sau:
+
+### Đoạn mã
+ACRCLOUD_HOST=your_acrcloud_host
+ACRCLOUD_ACCESS_KEY=your_acrcloud_access_key
+ACRCLOUD_ACCESS_SECRET=your_acrcloud_secret_key
+GROQ_API_KEY=your_groq_api_key
+### Chạy Server:
+
+Bash
+uvicorn main:app --reload
+2. Khởi động Frontend
+Mở một terminal MỚI, di chuyển vào thư mục frontend:
+
+Bash
+cd frontend
+npm install
+npm run dev

@@ -11,6 +11,7 @@ export interface HistoryTrack {
   artist: string;
   album_art: string;
   preview_url: string;
+  recognized_lyrics: string;
   timestamp: string;
 }
 
@@ -39,6 +40,7 @@ function normalizeHistoryItem(value: unknown): HistoryTrack | null {
     artist: track.artist,
     album_art: typeof track.album_art === 'string' ? track.album_art : '',
     preview_url: typeof track.preview_url === 'string' ? track.preview_url : '',
+    recognized_lyrics: typeof track.recognized_lyrics === 'string' ? track.recognized_lyrics : '',
     timestamp: track.timestamp,
   };
 }
@@ -100,6 +102,7 @@ async function migrateLegacyHistoryIfNeeded(): Promise<void> {
               artist: legacy.artist,
               album_art: typeof legacy.albumArtUri === 'string' ? legacy.albumArtUri : '',
               preview_url: '',
+              recognized_lyrics: '',
               timestamp: legacy.timestamp,
             };
           })

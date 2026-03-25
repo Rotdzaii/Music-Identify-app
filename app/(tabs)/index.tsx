@@ -146,6 +146,7 @@ export default function HomeScreen() {
         artist: firstMatch.artist,
         album_art: firstMatch.albumArt,
         preview_url: firstMatch.previewUrl,
+        recognized_lyrics: sttResult.rawText,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {

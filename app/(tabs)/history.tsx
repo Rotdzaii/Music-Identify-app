@@ -162,6 +162,11 @@ export default function HistoryScreen() {
                       <Text numberOfLines={1} style={styles.songArtist}>
                         {item.artist}
                       </Text>
+                      {item.recognized_lyrics ? (
+                        <Text numberOfLines={2} ellipsizeMode="tail" style={styles.recognizedLyrics}>
+                          " {item.recognized_lyrics}
+                        </Text>
+                      ) : null}
                       <Text style={styles.songTime}>{formatRelativeTime(item.timestamp)}</Text>
                     </View>
 
@@ -297,6 +302,12 @@ const styles = StyleSheet.create({
   songTime: {
     color: Theme.colors.mutedForeground,
     fontSize: 12,
+    marginTop: 4,
+  },
+  recognizedLyrics: {
+    color: Theme.colors.mutedForeground,
+    fontSize: 12,
+    fontStyle: 'italic',
     marginTop: 4,
   },
   actions: {
