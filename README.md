@@ -4,7 +4,7 @@
 
 ---
 
-## 🌟 Tính năng chính (Functional Requirements)
+##  Tính năng chính (Functional Requirements)
 
 Hệ thống được thiết kế để đáp ứng đầy đủ các yêu cầu nghiệp vụ sau:
 
@@ -26,22 +26,29 @@ Hệ thống được thiết kế để đáp ứng đầy đủ các yêu cầ
 
 * **Frontend:** React Native (Expo)
 * **Backend:** FastAPI (Python 3.10+)
-* **STT Engine:** WhisperX (tích hợp VAD để lọc tạp âm)
-* **Xử lý âm thanh:** FFmpeg
-* **Lưu trữ:** AsyncStorage (Local) & Music API (External)
+* **Core AI & Recognition Engine (Nhận diện & AI):**  
+
+ACRCloud API: Thuật toán Audio Fingerprinting để nhận diện nhạc gốc (nhạc phát từ loa) với tốc độ cao.
+
+Groq Cloud API (Fallback System):
+
+    Whisper-large-v3: Mô hình STT (Speech-to-Text) bóc băng lời hát chay siêu tốc độ.
+
+    Llama-3.3-70b: Mô hình LLM suy luận, "dịch" lời hát chay thành tên bài hát chuẩn xác.
+* **XExternal Data APIs:** 
+    iTunes Search API: Truy xuất metadata bài hát (Ảnh bìa nét cao, Tên bài, Ca sĩ).
+
+    LRCLIB API: Truy xuất kho lời bài hát đồng bộ (Full Lyrics) cho nhánh nhạc gốc.
+* **Lưu trữ:** AsyncStorage (Local)
 
 ---
 
 
-## 📖 Hướng dẫn sử dụng (User Guide)
+##  Hướng dẫn sử dụng (User Guide)
 
 Để đạt được hiệu quả nhận diện tốt nhất, vui lòng thực hiện theo các bước sau:
 
-# 🎵 Ứng dụng Nhận diện Âm nhạc (Music Recognition System)
-
-Hệ thống nhận diện âm nhạc sử dụng kiến trúc "Động cơ kép", hỗ trợ tìm kiếm bài hát thông qua âm thanh gốc (nhạc phát từ loa) và nhận diện giọng hát chay (A Cappella).
-
-## 🚀 Hướng dẫn cài đặt và chạy trên máy tính mới
+##  Hướng dẫn cài đặt và chạy trên máy tính mới
 
 ### 1. Khởi động Backend
 Mở terminal, di chuyển vào thư mục `backend`:
