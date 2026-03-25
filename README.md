@@ -32,21 +32,6 @@ Hệ thống được thiết kế để đáp ứng đầy đủ các yêu cầ
 
 ---
 
-## 📂 Cấu trúc dự án (Project Structure)
-
-
-MUSICIDAPP/
-├── app/                  # Screens & Điều hướng (Expo Router)
-├── backend/              # Mã nguồn Server FastAPI
-│   ├── main.py           # Entry point của Server
-│   ├── app/services/     # Logic STT (WhisperX) và Tìm kiếm
-│   ├── app/utils/        # Xử lý văn bản (FR-04)
-│   └── uploads/          # Lưu trữ tạm file audio (.m4a)
-├── components/           # UI Components tái sử dụng
-├── constants/            # Theme, Màu sắc và Global Styles
-├── hooks/                # Logic ghi âm và quản lý trạng thái
-├── services/             # Client gọi API từ App lên Server
-└── lib/                  # Các hàm tiện ích dùng chung
 
 ## 📖 Hướng dẫn sử dụng (User Guide)
 
